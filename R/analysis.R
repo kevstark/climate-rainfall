@@ -68,29 +68,35 @@ plot_grid(
       breaks = as.Date(floor_date(now(), "year") + (period(1, "month") * seq(0,12)) + period(1, "day")),
       labels = c("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D", "J+")) +
     coord_cartesian(ylim = c(0, ceiling(max(rainfall_year_cuml_summary$rainfall_mm)))) +
-    xlab("") +
     theme(
       legend.position = "none",
       plot.margin = margin(r = -10, unit = "pt"),
-      plot.title = element_text(hjust = 0)
+      plot.title = element_text(hjust = 0),
+      axis.title.x = element_blank(),
+      plot.caption = element_text(size = 8)
     ) +
-    labs(title = "Harrisville QLD")
+    labs(
+      title = "Harrisville QLD",
+      subtitle = paste0("BOM: IDCJAC0009 | 040094 | ", paste0(range(rainfall_year_cuml$year), collapse = "-")),
+      caption =""
+    )
   ,
   rainfall_year_cuml_summary %>%
     ggplot(aes(x = rainfall_mm)) +
     geom_density(fill = "lightgrey", col = "grey") +
     geom_vline(xintercept = rainfall_year_cuml_summary %>% filter(year == year(now())) %>% pull(rainfall_mm), colour = "blue") +
     geom_rug() +
-    ylab("") +
     xlab("") +
     coord_flip(xlim = c(0, ceiling(max(rainfall_year_cuml_summary$rainfall_mm)))) +
     theme(
       axis.text.y = element_blank(),
       axis.text.x = element_text(colour = "white"),
       plot.margin = margin(l = -10, unit = "pt"),
-      axis.line = element_line(colour = "white")
+      axis.line = element_line(colour = "white"),
+      axis.title.x = element_blank(),
+      plot.caption = element_text(size = 8)
     ) +
-    labs(title = " ")
+    labs(title = " ", subtitle = "", caption = "source: https://github.com/kevstark/climate-rainfall")
   , axis = "b"
   , rel_widths = c(0.8, 0.2)
   )
