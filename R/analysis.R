@@ -6,10 +6,10 @@ library(lubridate)
 library(scales)
 library(cowplot)
 
-source = "data/IDCJAC0009_040094_1800.zip"
+source = "IDCJAC0009_040094_1800.zip"
 
 rainfall_ledger <- readr::read_csv(
-  unz(source, filename = paste0(stringr::str_replace(basename(source), ".zip", "_Data.csv"))),
+  unz(file.path("data", source), filename = paste0(stringr::str_replace(basename(source), ".zip", "_Data.csv"))),
   col_names = c("bom_product", "bom_station", "year", "month", "day", "rainfall_mm", "rainfall_days", "quality"),
   skip = 1,
   col_types = cols(
@@ -25,12 +25,16 @@ rainfall_ledger <- readr::read_csv(
 )
 
 
-readr::read_lines(
-  unz(source, filename = paste0(stringr::str_replace(basename(source), ".zip", "_Note.txt"))),
+rainfall_meta <- readr::read_lines(
+  unz(file.path("data", source), filename = paste0(stringr::str_replace(basename(source), ".zip", "_Note.txt")))
 )
+bom_station <- stringr::str_split(rainfall_meta[grepl(rainfall_meta, pattern = "Bureau of Meteorology station number: ")], ": ", simplify = TRUE)[[2]]
+bom_name <- stringr::str_split(rainfall_meta[grepl(rainfall_meta, pattern = "Station name: ")], ": ", simplify = TRUE)[[2]]
+bom_lat <- stringr::str_split(rainfall_meta[grepl(rainfall_meta, pattern = "Latitude \\(decimal degrees, south negative\\): ")], ": ", simplify = TRUE)[[2]]
+bom_lon <- stringr::str_split(rainfall_meta[grepl(rainfall_meta, pattern = "Longitude \\(decimal degrees, east positive\\): ")], ": ", simplify = TRUE)[[2]]
 
-summary(rainfall_ledger)
-purrr::map(rainfall_ledger, unique)
+# summary(rainfall_ledger)
+# purrr::map(rainfall_ledger, unique)
 
 # Calculate a date object
 rainfall_ledger %<>%
@@ -49,35 +53,33 @@ rainfall_year_cuml <-
   mutate(rainfall_mm = cumsum(rainfall_mm)) %>%
   ungroup()
 
-rainfall_year_cuml %>% summary
-
 rainfall_year_cuml_summary <-
   rainfall_year_cuml %>%
   group_by(year) %>%
   summarise(rainfall_mm = max(rainfall_mm))
 
-rainfall_year_cuml_summary[which(rainfall_year_cuml_summary$rainfall_mm == min(rainfall_year_cuml_summary$rainfall_mm)), ]
-
 plot_grid(
   rainfall_year_cuml %>%
     ggplot(aes(x = as.Date(lubridate::floor_date(now(), "year") + (lubridate::period(1, "day") * doy)), y = rainfall_mm, group = year)) +
-    geom_line(colour = "grey") +
-    geom_line(data = rainfall_year_cuml %>% filter(year == lubridate::year(now() - period(1, "year"))), colour = "blue", size = 0.5) +
-    geom_line(data = rainfall_year_cuml %>% filter(year == lubridate::year(now())), colour = "blue", size = 2) +
+    geom_line(aes(colour = "hist")) +
+    geom_line(data = rainfall_year_cuml %>% filter(year == lubridate::year(now() - period(1, "year"))), colour="blue", aes(size = "last")) +
+    geom_line(data = rainfall_year_cuml %>% filter(year == lubridate::year(now())), colour = "blue", aes(size = "curr")) +
+    scale_colour_manual(name="", labels = c("History"), values=c("hist" = "grey")) +
+    scale_size_manual(name="", labels = c("last" = "2017", "curr" = "2018"), values=c("last" = 0.5, "curr" = 2)) +
     scale_x_date(
       breaks = as.Date(floor_date(now(), "year") + (period(1, "month") * seq(0,12)) + period(1, "day")),
       labels = c("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D", "J+")) +
     coord_cartesian(ylim = c(0, ceiling(max(rainfall_year_cuml_summary$rainfall_mm)))) +
     theme(
-      legend.position = "none",
+      legend.position = "bottom",
       plot.margin = margin(r = -10, unit = "pt"),
       plot.title = element_text(hjust = 0),
       axis.title.x = element_blank(),
       plot.caption = element_text(size = 8)
     ) +
     labs(
-      title = "Harrisville QLD",
-      subtitle = paste0("BOM: IDCJAC0009 | 040094 | ", paste0(range(rainfall_year_cuml$year), collapse = "-")),
+      title = stringr::str_to_title(bom_name),
+      subtitle = paste0("bom: ", bom_station, " {", bom_lat, ", ", bom_lon, "} | ", paste0(range(rainfall_year_cuml$year), collapse = "-")),
       caption =""
     )
   ,
@@ -94,20 +96,13 @@ plot_grid(
       plot.margin = margin(l = -10, unit = "pt"),
       axis.line = element_line(colour = "white"),
       axis.title.x = element_blank(),
-      plot.caption = element_text(size = 8)
+      plot.caption = element_text(size = 8, margin = margin(t = 49, unit = "pt"))
     ) +
     labs(title = " ", subtitle = "", caption = "source: https://github.com/kevstark/climate-rainfall")
   , axis = "b"
   , rel_widths = c(0.8, 0.2)
-  )
-
-x %>%
-  group_by(year = year(date)) %>%
-  summarise(rainfall_mm = sum(rainfall_mm, na.rm = TRUE)) %>%
-  arrange(year) %>%
-  ggplot(aes(x = year, y = rainfall_mm)) +
-  geom_line() +
-  geom_smooth()
+)
+ggsave(file.path("img", stringr::str_replace(source, ".zip$", ".png")), width = 12, height = 9)
 
 # Inputs
 # History (months: 1:n)
