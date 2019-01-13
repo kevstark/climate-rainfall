@@ -21,7 +21,7 @@ library(lubridate)
 # Define server logic required to draw a histogram
 shinyServer(function(input, output, session) {
 
-  bomstationids <- reactiveVal(value = c("040094", "041405"))
+  bomstationids <- reactiveVal(value = character(0))
   bomstationdata <- reactiveValues()
 
   bomstation_ledger <- reactiveVal()
@@ -121,43 +121,59 @@ shinyServer(function(input, output, session) {
   # Parse and reformat rainfall ledger
   observe({
     req(bomstationdata)
-    ledger <- bind_rows(purrr::map(names(bomstationdata), ~ bomstationdata[[.]][["data"]]))
-    ledger <- mutate(ledger, date = lubridate::ymd(paste(year, month, day, sep = "-")))
-    # Convert multi-day rain events back to daily (as average)
-    ledger %<>% arrange(bom_station, date) %>% mutate(rainfall_mm_day = rainfall_mm)
-    for (i in seq_len(nrow(ledger))) {
-      if(!is.na(ledger$rainfall_days[i])) {
-        if(ledger$rainfall_days[i] > 1) {
-          ledger$rainfall_mm_day[i:(i - ledger$rainfall_days[i] + 1)] <- ledger$rainfall_mm[i] / ledger$rainfall_days[i]
+    if(length(names(bomstationdata)) > 0) {
+      ledger <- bind_rows(purrr::map(names(bomstationdata), ~ bomstationdata[[.]][["data"]]))
+      ledger <- mutate(ledger, date = lubridate::ymd(paste(year, month, day, sep = "-")))
+      # Convert multi-day rain events back to daily (as average)
+      ledger %<>% arrange(bom_station, date) %>% mutate(rainfall_mm_day = rainfall_mm)
+      for (i in seq_len(nrow(ledger))) {
+        if(!is.na(ledger$rainfall_days[i])) {
+          if(ledger$rainfall_days[i] > 1) {
+            ledger$rainfall_mm_day[i:(i - ledger$rainfall_days[i] + 1)] <- ledger$rainfall_mm[i] / ledger$rainfall_days[i]
+          }
         }
       }
-    }
-    meta <- bind_rows(purrr::map(names(bomstationdata), ~bomstationdata[[.]][["meta"]])) %>%
-      select(-coverage) %>%
-      mutate(station = stringr::str_pad(station, 6, side = "left", pad = "0"))
+      meta <- bind_rows(purrr::map(names(bomstationdata), ~bomstationdata[[.]][["meta"]])) %>%
+        select(-coverage) %>%
+        mutate(station = stringr::str_pad(station, 6, side = "left", pad = "0"))
 
-    ledger <- ledger %>% left_join(meta, by = c("bom_station" = "station")) %>% arrange(name)
-    bomstation_ledger(ledger)
-    saveRDS(ledger, "debug_bomstation_ledger.RDS")
+      ledger <- ledger %>% left_join(meta, by = c("bom_station" = "station")) %>% arrange(name)
+      bomstation_ledger(ledger)
+      saveRDS(ledger, "debug_bomstation_ledger.RDS")
+    }
   })
 
   # Update the available date range as new station data is added
   observe({
     req(bomstation_ledger)
-    updateDateRangeInput(
-      session,
-      "explore_datefilter",
-      start = min(bomstation_ledger()$date),
-      end = max(bomstation_ledger()$date),
-      min = lubridate::floor_date(min(bomstation_ledger()$date), "year"),
-      max = lubridate::ceiling_date(max(bomstation_ledger()$date), "year")
+    if(!is.null(bomstation_ledger())) {
+      print("updateDateRangeInput(bomstation_ledger())")
+      updateDateRangeInput(
+        session,
+        "explore_datefilter",
+        start = min(bomstation_ledger()$date),
+        end = max(bomstation_ledger()$date),
+        min = lubridate::floor_date(min(bomstation_ledger()$date), "year"),
+        max = lubridate::ceiling_date(max(bomstation_ledger()$date), "year")
       )
+    } else {
+      print("updateDateRangeInput()")
+      updateDateRangeInput(
+        session,
+        "explore_datefilter",
+        start = lubridate::now(),
+        end = lubridate::now(),
+        min = lubridate::floor_date(lubridate::now(), "year"),
+        max = lubridate::ceiling_date(lubridate::now(), "year")
+      )
+    }
   })
 
   # Update metadata table with stationid info
   output$bomstation_summary <- DT::renderDataTable({
     req(bomstationdata)
-    message("summary: ", names(bomstationdata))
+    message("output$bomstation_summary: ", names(bomstationdata))
+
     if(length(names(bomstationdata)) > 0) {
       meta <- bind_rows(purrr::map(names(bomstationdata), ~ bomstationdata[[.]][["meta"]]))
       meta %<>% mutate(coverage = paste0('<img src="', coverage, '" height="30" style="align:left;border:0px;vspace:0px"/><img src="http://www.bom.gov.au/climate/cdo/images/about/timeline.png" height="19" style="align:left;border:0px;vspace:0px"/>'))
