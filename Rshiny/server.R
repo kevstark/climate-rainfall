@@ -206,11 +206,18 @@ shinyServer(function(input, output, session) {
 
     #bomstation_ledger <- readRDS("Rshiny/debug_bomstation_ledger.RDS")
     #bomstationdata <- readRDS("Rshiny/debug_bomstationdata.RDS")
+    # input <- list(
+    #   explore_datefilter = c("1800-01-01", "2018-12-31"),
+    #   explore_timespan = which(names(ui_timespan_months) == "5y") - 1,
+    #   explore_lowfilter = 5
+    # )
 
     # Calculate a day-of-year index
     ledger <- bomstation_ledger() %>%
+      arrange(date) %>%
       filter(date >= lubridate::ymd(input$explore_datefilter[1])) %>%
       filter(date <= lubridate::ymd(input$explore_datefilter[2])) %>%
+      mutate(rainfall_mm_day = ifelse(rainfall_mm_day < input$explore_lowfilter, 0, rainfall_mm_day)) %>%
       mutate(doy = lubridate::yday(date))
     cat("  ledger: [", paste(dim(ledger), collapse = " x "), "]\n")
 
@@ -237,7 +244,7 @@ shinyServer(function(input, output, session) {
           filter(!is.na(rainfall_mm_day)) %>%
           arrange(date) %>%
           mutate(rainfall_mm_cuml = cumsum(rainfall_mm_day)) %>%
-          mutate(date_norm = max(ledger_seq$date) + (date - max(date)))
+          mutate(date_norm = lubridate::ymd(input$explore_datefilter[2]) + (date - ledger_seq[i, ]$date))
       }
     )
 
@@ -245,21 +252,30 @@ shinyServer(function(input, output, session) {
     ledger_seq_valid <- 1 - (ledger_seq$days - purrr::map_int(ledger_seq_data, nrow)) / ledger_seq$days > 0.95
     ledger_seq_valid[is.na(ledger_seq_valid)] <- FALSE
     cat("  ledger_seq_valid: ", sum(ledger_seq_valid), "\n")
+
+    # index numbers of all valid sequences, plus the last sequence if it has data (which may be partial/invalid)
+    ledger_seq_valid_plot <- seq_len(nrow(ledger_seq))[ledger_seq_valid]
+    if(nrow(ledger_seq_data[[length(ledger_seq_data)]]) > 0)
+    {
+      ledger_seq_valid_plot <- unique(c(ledger_seq_valid_plot, length(ledger_seq_data)))
+    }
+
     # Generate cumulative rainfall plot
     p1 <- plot_ly(height=800)
 
     purrr::walk(
-      seq_len(nrow(ledger_seq))[ledger_seq_valid],
+      ledger_seq_valid_plot,
       function(i) {
+        data <- ledger_seq_data[[i]] #%>% group_by(rainfall_mm_cuml) %>% dplyr::slice(1 | n()) %>% ungroup()
         p1 <<- add_trace(
           p1,
-          data = ledger_seq_data[[i]],
+          data = data,
           x = ~date_norm,
           y = ~rainfall_mm_cuml,
           color = ~name,
           type = 'scatter',
           mode = 'lines',
-          text = paste0(ledger_seq_data[[i]]$bom_station, " ", ledger_seq_data[[i]]$name, " | ", ledger_seq_data[[i]]$date, ": ", formatC(round(ledger_seq_data[[i]]$rainfall_mm_cuml), big.mark=","), "mm"),
+          text = paste0(data$bom_station, " ", data$name, " | ", data$date, ": ", formatC(round(data$rainfall_mm_cuml), big.mark=","), "mm"),
           hoverinfo = 'text',
           opacity = ifelse(ledger_seq[i, "date"][[1]] == input$explore_datefilter[2], 1, 0.5),
           line = list(width = ifelse(ledger_seq[i, "date"][[1]] == input$explore_datefilter[2], 5, 1)),

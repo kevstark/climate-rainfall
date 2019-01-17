@@ -84,7 +84,8 @@ dashboardPage(
             collapsible = TRUE,
             width = 12,
             dateRangeInput("explore_datefilter", label = "Select date range to explore", startview = "year"),
-            uiOutput("explore_timespan")
+            uiOutput("explore_timespan", width = 12),
+            numericInput("explore_lowfilter", label = "Remove low-rainfall days below: (mm)", min = 0, value = 0)
           )
           ,
           box(
