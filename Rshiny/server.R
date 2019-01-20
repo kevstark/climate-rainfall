@@ -284,9 +284,14 @@ shinyServer(function(input, output, session) {
       }
     )
 
+    # Show abbr month by default
     p1 <- p1 %>% layout(xaxis = list(tickformat = '%b'))
-    if(input$explore_timespan <= 2) { p1 <- p1 %>% layout(xaxis = list(tickformat = '%d-%b')) }
-    if(input$explore_timespan >= 8) { p1 <- p1 %>% layout(xaxis = list(tickformat = '%Y')) }
+    # Show day-Month if less or equal to than 6 months
+    if(ui_timespan_months[input$explore_timespan + 1] <= 6) { p1 <- p1 %>% layout(xaxis = list(tickformat = '%d-%b')) }
+    # Show Year/Mon if greater than 12 months
+    if(ui_timespan_months[input$explore_timespan + 1] > 12) { p1 <- p1 %>% layout(xaxis = list(tickformat = '%Y/%m')) }
+    # Show only year if more than 5y
+    if(ui_timespan_months[input$explore_timespan + 1] > 60) { p1 <- p1 %>% layout(xaxis = list(tickformat = '%Y')) }
 
     ledger_seq_max = tibble(
       bom_station = purrr::map_chr(ledger_seq_data, ~ .[1, "bom_station"][[1]]),
