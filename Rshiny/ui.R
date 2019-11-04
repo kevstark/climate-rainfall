@@ -92,7 +92,7 @@ dashboardPage(
             title = "Cumulative Rainfall",
             collapsible = FALSE,
             width = 12,
-            height = 900,
+            height = 700,
             plotlyOutput("explore_cumulativeplot")
           )
         )

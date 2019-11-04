@@ -261,7 +261,7 @@ shinyServer(function(input, output, session) {
     }
 
     # Generate cumulative rainfall plot
-    p1 <- plot_ly(height=800)
+    p1 <- plot_ly(height=600)
 
     purrr::walk(
       ledger_seq_valid_plot,
@@ -308,6 +308,8 @@ shinyServer(function(input, output, session) {
       name = rep(names(ledger_seq_dens), each = length(ledger_seq_dens[[1]]$x))
     )
 
+
+
     # Density plot per station
     p2 <- plot_ly(
       ledger_seq_dens,
@@ -316,7 +318,7 @@ shinyServer(function(input, output, session) {
       color = ~name,
       text = paste0(ledger_seq_dens$name, ": ", formatC(round(ledger_seq_dens$rainfall_mm_cuml), big.mark=","), "mm"),
       type = 'scatter', mode = 'lines',
-      height=800,
+      height=600,
       hoverinfo = 'text',
       fill = 'tozerox'
     ) %>% layout(
